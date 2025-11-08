@@ -937,6 +937,29 @@ def train_reg_model(df: pl.DataFrame, features: List[str], target: str, model: n
     y_hat = batch_train_reg(model, X_train, X_test, y_train, y_test, no_epochs, loss, optimizer, lr = lr, logging = log)
 
     
+def get_linear_params_reg(model: nn.Module):
+    """
+    Extract weights and biases from all Linear layers in an MLP-style model.
+    Returns a tuple (weights, biases), each as a list of numpy arrays.
+    """
+    weights = []
+    biases = []
+    
+    # If the model has a Sequential container called 'network'
+    if hasattr(model, "network"):
+        layers = model.network
+    else:
+        # fallback: iterate all submodules
+        layers = model.modules()
+    
+    for layer in layers:
+        if isinstance(layer, nn.Linear):
+            weights.append(layer.weight.detach().cpu().numpy())
+            biases.append(layer.bias.detach().cpu().numpy())
+    
+    return weights, biases
+
+
 
 def benchmark_reg_model(df: pl.DataFrame, features: List[str], target: str, model: nn.Module, annualized_rate, test_size=0.25, loss = None, optimizer = None, no_epochs = None, log = False, lr = None):
     df_train, df_test = timeseries_split(df, test_size=test_size)
@@ -949,7 +972,7 @@ def benchmark_reg_model(df: pl.DataFrame, features: List[str], target: str, mode
     
     perf = eval_model_performance(y_test, y_hat, features, target, annualized_rate)
     
-    weights, biases = get_linear_params(model)
+    weights, biases = get_linear_params_reg(model)
     perf['weights'] = str(weights)
     perf['biases'] = str(biases)
     
